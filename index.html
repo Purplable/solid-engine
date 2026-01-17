@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seed Chat - 暗号化プライベートチャット</title>
+    <meta name="description" content="シードを共有した人だけが参加できる、完全暗号化のプライベートチャット。登録不要、12時間で自動削除。">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- App Styles -->
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<body>
+    <!-- ローディング画面 -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>暗号化を初期化中...</p>
+        </div>
+    </div>
+
+    <!-- メインコンテナ -->
+    <div id="app" class="app-container hidden">
+
+        <!-- ホーム画面（シード入力） -->
+        <section id="home-screen" class="screen">
+            <div class="home-content">
+                <div class="logo">
+                    <span class="logo-icon">🔐</span>
+                    <h1>Seed Chat</h1>
+                </div>
+
+                <p class="tagline">シードを共有した人だけの、秘密のチャット</p>
+
+                <div class="seed-input-container">
+                    <div class="input-wrapper">
+                        <input type="text" id="seed-input" placeholder="シードを入力..." autocomplete="off"
+                            spellcheck="false">
+                        <button id="toggle-visibility" class="icon-btn" title="表示切替">
+                            <span class="icon-show">👁️</span>
+                            <span class="icon-hide hidden">🔒</span>
+                        </button>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="generate-seed-btn" class="btn btn-secondary">
+                            <span>🎲</span> 新規シード生成
+                        </button>
+                        <button id="join-chat-btn" class="btn btn-primary">
+                            <span>🚀</span> 参加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="generated-seed-container hidden" id="generated-seed-container">
+                    <p class="label">生成されたシード:</p>
+                    <div class="seed-display">
+                        <code id="generated-seed"></code>
+                        <button id="copy-generated-seed" class="icon-btn" title="コピー">📋</button>
+                    </div>
+                    <p class="hint">⚠️ このシードを安全に保存してください。共有した人のみがチャットに参加できます。</p>
+                </div>
+
+                <div class="features">
+                    <div class="feature">
+                        <span class="feature-icon">🔒</span>
+                        <span>完全暗号化</span>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">👤</span>
+                        <span>登録不要</span>
+                    </div>
+                    <div class="feature">
+                        <span class="feature-icon">⏰</span>
+                        <span>12時間で削除</span>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="home-footer">
+                <p>サーバーはメッセージを読めません。あなたのプライバシーは完全に保護されています。</p>
+            </footer>
+        </section>
+
+        <!-- チャット画面 -->
+        <section id="chat-screen" class="screen hidden">
+            <header class="chat-header">
+                <div class="header-left">
+                    <button id="leave-chat-btn" class="icon-btn" title="退出">
+                        ←
+                    </button>
+                    <div class="header-info">
+                        <h2>🔐 暗号化チャット</h2>
+                        <span id="room-status" class="room-status">接続中...</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div id="countdown" class="countdown">
+                        <span class="countdown-icon">⏰</span>
+                        <span id="countdown-time">--:--:--</span>
+                    </div>
+                    <button id="copy-seed-btn" class="btn btn-small">
+                        📋 シードをコピー
+                    </button>
+                    <button id="archive-btn" class="btn btn-small">
+                        💾 アーカイブ
+                    </button>
+                </div>
+            </header>
+
+            <main class="chat-main">
+                <div id="messages-container" class="messages-container">
+                    <div class="messages-empty" id="messages-empty">
+                        <p>🔐 暗号化チャットルームへようこそ！</p>
+                        <p>同じシードを持つ人がここでチャットできます。</p>
+                    </div>
+                    <div id="messages-list" class="messages-list"></div>
+                </div>
+            </main>
+
+            <footer class="chat-footer">
+                <div class="name-input-wrapper">
+                    <label for="user-name">名前:</label>
+                    <input type="text" id="user-name" placeholder="あなたの名前" maxlength="20">
+                    <button id="change-name-btn" class="icon-btn" title="名前を変更">🔄</button>
+                </div>
+                <div class="message-input-wrapper">
+                    <textarea id="message-input" placeholder="メッセージを入力... (Enter で送信, Shift+Enter で改行)"
+                        rows="1"></textarea>
+                    <button id="send-btn" class="btn btn-primary btn-send">
+                        📤
+                    </button>
+                </div>
+            </footer>
+        </section>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- スクリプト -->
+    <script src="./js/crypto.js"></script>
+    <script src="./js/supabase-client.js"></script>
+    <script src="./js/chat.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+
+</html>
