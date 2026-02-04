@@ -10,6 +10,9 @@ const SupabaseClient = (function () {
     const SUPABASE_URL = 'https://epngjunolrveufqgmtls.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwbmdqdW5vbHJ2ZXVmcWdtdGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1NjgwNDIsImV4cCI6MjA4NDE0NDA0Mn0.yoD6903cAlgPFyu8GAYx8zNpn5uhB-a3aB7X8r_cyZE';
 
+    // Fix #11: Message TTL constant (server-side enforcement via Supabase RLS/cron is also required)
+    const MESSAGE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
     let supabase = null;
     let currentChannel = null;
     let isConfigured = false;
@@ -97,7 +100,7 @@ const SupabaseClient = (function () {
         }
 
         try {
-            const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000); // 12時間後
+            const expiresAt = new Date(Date.now() + MESSAGE_TTL_MS);
 
             const { data, error } = await supabase
                 .from('purplecrypto')
@@ -167,7 +170,8 @@ const SupabaseClient = (function () {
         saveMessage,
         getMessages,
         leaveRoom,
-        getIsConfigured
+        getIsConfigured,
+        MESSAGE_TTL_MS
     };
 })();
 

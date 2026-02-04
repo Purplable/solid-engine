@@ -234,11 +234,6 @@ body::before {
     border-radius: var(--radius-lg);
     color: var(--color-text-primary);
     transition: all var(--transition-normal);
-    -webkit-text-security: disc;
-}
-
-.input-wrapper input.visible {
-    -webkit-text-security: none;
 }
 
 .input-wrapper input:focus {
@@ -775,6 +770,34 @@ body::before {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--color-border-hover);
+}
+
+/* ===================================
+   Language Toggle
+   =================================== */
+.lang-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1001;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-main);
+    background: var(--color-bg-glass);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.lang-toggle:hover {
+    background: var(--color-bg-glass-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
 }
 
 /* ===================================

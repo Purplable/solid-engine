@@ -13,6 +13,9 @@ const ChatUI = (function () {
     let messages = [];
     let roomCreatedAt = null;
 
+    // Fix #20: Unbounded messages array limit
+    const MAX_MESSAGES = 500;
+
     /**
      * DOM 要素を取得
      */
@@ -62,6 +65,14 @@ const ChatUI = (function () {
 
         messages.push(messageData);
 
+        // Fix #20: Trim oldest messages if over limit
+        while (messages.length > MAX_MESSAGES) {
+            messages.shift();
+            if (elements.messagesList && elements.messagesList.firstChild) {
+                elements.messagesList.removeChild(elements.messagesList.firstChild);
+            }
+        }
+
         // 空メッセージ表示を隠す
         if (elements.messagesEmpty) {
             elements.messagesEmpty.classList.add('hidden');
@@ -72,7 +83,8 @@ const ChatUI = (function () {
         messageEl.className = `message ${isOwn ? 'own' : 'other'}`;
         messageEl.dataset.id = id;
 
-        const time = new Date(timestamp).toLocaleTimeString('ja-JP', {
+        const locale = I18n.getLang() === 'ja' ? 'ja-JP' : 'en-US';
+        const time = new Date(timestamp).toLocaleTimeString(locale, {
             hour: '2-digit',
             minute: '2-digit'
         });
@@ -181,7 +193,7 @@ const ChatUI = (function () {
         if (!elements.countdownTime) return;
 
         if (remainingMs <= 0) {
-            elements.countdownTime.textContent = '期限切れ';
+            elements.countdownTime.textContent = I18n.t('expired');
             return;
         }
 
@@ -214,23 +226,24 @@ const ChatUI = (function () {
      */
     function exportToText() {
         const lines = [];
-        const now = new Date().toLocaleString('ja-JP');
+        const locale = I18n.getLang() === 'ja' ? 'ja-JP' : 'en-US';
+        const now = new Date().toLocaleString(locale);
 
         lines.push('='.repeat(50));
-        lines.push('Seed Chat アーカイブ');
-        lines.push(`エクスポート日時: ${now}`);
+        lines.push(I18n.t('archiveHeader'));
+        lines.push(`${I18n.t('exportDate')}: ${now}`);
         lines.push('='.repeat(50));
         lines.push('');
 
         messages.forEach(msg => {
-            const time = new Date(msg.timestamp).toLocaleString('ja-JP');
+            const time = new Date(msg.timestamp).toLocaleString(locale);
             lines.push(`[${time}] ${msg.senderName}:`);
             lines.push(msg.text);
             lines.push('');
         });
 
         lines.push('='.repeat(50));
-        lines.push('このチャットはエンドツーエンド暗号化されていました。');
+        lines.push(I18n.t('archiveFooter'));
         lines.push('='.repeat(50));
 
         return lines.join('\n');

@@ -14,19 +14,24 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
 
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase JS (pinned version with SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"
+        integrity="sha384-YieCqqg9gQufX7+5HcFvCEg/n3KUEdl8/Jb+A6J0npf1mB740VayvwKjTrtCeUoy"
+        crossorigin="anonymous"></script>
 
     <!-- App Styles -->
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
+    <!-- Language Toggle (always visible) -->
+    <button id="lang-toggle" class="lang-toggle" onclick="I18n.toggle()">EN</button>
+
     <!-- ローディング画面 -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-content">
             <div class="loading-spinner"></div>
-            <p>暗号化を初期化中...</p>
+            <p data-i18n="loadingText">暗号化を初期化中...</p>
         </div>
     </div>
 
@@ -41,13 +46,15 @@
                     <h1>Seed Chat</h1>
                 </div>
 
-                <p class="tagline">シードを共有した人だけの、秘密のチャット</p>
+                <p class="tagline" data-i18n="tagline">シードを共有した人だけの、秘密のチャット</p>
 
                 <div class="seed-input-container">
                     <div class="input-wrapper">
-                        <input type="text" id="seed-input" placeholder="シードを入力..." autocomplete="off"
-                            spellcheck="false">
-                        <button id="toggle-visibility" class="icon-btn" title="表示切替">
+                        <input type="password" id="seed-input"
+                            data-i18n-placeholder="seedPlaceholder" placeholder="シードを入力..."
+                            autocomplete="off" spellcheck="false">
+                        <button id="toggle-visibility" class="icon-btn"
+                            data-i18n-title="toggleVisibility" title="表示切替">
                             <span class="icon-show">👁️</span>
                             <span class="icon-hide hidden">🔒</span>
                         </button>
@@ -55,41 +62,42 @@
 
                     <div class="button-group">
                         <button id="generate-seed-btn" class="btn btn-secondary">
-                            <span>🎲</span> 新規シード生成
+                            <span>🎲</span> <span data-i18n="generateSeed">新規シード生成</span>
                         </button>
                         <button id="join-chat-btn" class="btn btn-primary">
-                            <span>🚀</span> 参加
+                            <span>🚀</span> <span data-i18n="join">参加</span>
                         </button>
                     </div>
                 </div>
 
                 <div class="generated-seed-container hidden" id="generated-seed-container">
-                    <p class="label">生成されたシード:</p>
+                    <p class="label" data-i18n="generatedSeedLabel">生成されたシード:</p>
                     <div class="seed-display">
                         <code id="generated-seed"></code>
-                        <button id="copy-generated-seed" class="icon-btn" title="コピー">📋</button>
+                        <button id="copy-generated-seed" class="icon-btn"
+                            data-i18n-title="copyTitle" title="コピー">📋</button>
                     </div>
-                    <p class="hint">⚠️ このシードを安全に保存してください。共有した人のみがチャットに参加できます。</p>
+                    <p class="hint">⚠️ <span data-i18n="seedHint">このシードを安全に保存してください。共有した人のみがチャットに参加できます。</span></p>
                 </div>
 
                 <div class="features">
                     <div class="feature">
                         <span class="feature-icon">🔒</span>
-                        <span>完全暗号化</span>
+                        <span data-i18n="featureEncrypted">完全暗号化</span>
                     </div>
                     <div class="feature">
                         <span class="feature-icon">👤</span>
-                        <span>登録不要</span>
+                        <span data-i18n="featureNoReg">登録不要</span>
                     </div>
                     <div class="feature">
                         <span class="feature-icon">⏰</span>
-                        <span>12時間で削除</span>
+                        <span data-i18n="featureAutoDelete">12時間で削除</span>
                     </div>
                 </div>
             </div>
 
             <footer class="home-footer">
-                <p>サーバーはメッセージを読めません。あなたのプライバシーは完全に保護されています。</p>
+                <p data-i18n="footerPrivacy">サーバーはメッセージを読めません。あなたのプライバシーは完全に保護されています。</p>
             </footer>
         </section>
 
@@ -97,12 +105,13 @@
         <section id="chat-screen" class="screen hidden">
             <header class="chat-header">
                 <div class="header-left">
-                    <button id="leave-chat-btn" class="icon-btn" title="退出">
+                    <button id="leave-chat-btn" class="icon-btn"
+                        data-i18n-title="leaveTitle" title="退出">
                         ←
                     </button>
                     <div class="header-info">
-                        <h2>🔐 暗号化チャット</h2>
-                        <span id="room-status" class="room-status">接続中...</span>
+                        <h2>🔐 <span data-i18n="chatTitle">暗号化チャット</span></h2>
+                        <span id="room-status" class="room-status" data-i18n="roomStatus">接続中...</span>
                     </div>
                 </div>
                 <div class="header-right">
@@ -111,10 +120,10 @@
                         <span id="countdown-time">--:--:--</span>
                     </div>
                     <button id="copy-seed-btn" class="btn btn-small">
-                        📋 シードをコピー
+                        📋 <span data-i18n="copySeedBtn">シードをコピー</span>
                     </button>
                     <button id="archive-btn" class="btn btn-small">
-                        💾 アーカイブ
+                        💾 <span data-i18n="archiveBtn">アーカイブ</span>
                     </button>
                 </div>
             </header>
@@ -122,8 +131,8 @@
             <main class="chat-main">
                 <div id="messages-container" class="messages-container">
                     <div class="messages-empty" id="messages-empty">
-                        <p>🔐 暗号化チャットルームへようこそ！</p>
-                        <p>同じシードを持つ人がここでチャットできます。</p>
+                        <p>🔐 <span data-i18n="welcomeMsg1">暗号化チャットルームへようこそ！</span></p>
+                        <p data-i18n="welcomeMsg2">同じシードを持つ人がここでチャットできます。</p>
                     </div>
                     <div id="messages-list" class="messages-list"></div>
                 </div>
@@ -131,13 +140,18 @@
 
             <footer class="chat-footer">
                 <div class="name-input-wrapper">
-                    <label for="user-name">名前:</label>
-                    <input type="text" id="user-name" placeholder="あなたの名前" maxlength="20">
-                    <button id="change-name-btn" class="icon-btn" title="名前を変更">🔄</button>
+                    <label for="user-name" data-i18n="nameLabel">名前:</label>
+                    <input type="text" id="user-name"
+                        data-i18n-placeholder="namePlaceholder" placeholder="あなたの名前"
+                        maxlength="20">
+                    <button id="change-name-btn" class="icon-btn"
+                        data-i18n-title="changeNameTitle" title="名前を変更">🔄</button>
                 </div>
                 <div class="message-input-wrapper">
-                    <textarea id="message-input" placeholder="メッセージを入力... (Enter で送信, Shift+Enter で改行)"
-                        rows="1"></textarea>
+                    <textarea id="message-input"
+                        data-i18n-placeholder="messagePlaceholder"
+                        placeholder="メッセージを入力... (Enter で送信, Shift+Enter で改行)"
+                        rows="1" maxlength="5000"></textarea>
                     <button id="send-btn" class="btn btn-primary btn-send">
                         📤
                     </button>
@@ -150,6 +164,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- スクリプト -->
+    <script src="i18n.js"></script>
     <script src="crypto.js"></script>
     <script src="supabase-client.js"></script>
     <script src="chat.js"></script>

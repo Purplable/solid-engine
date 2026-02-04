@@ -11,7 +11,7 @@ const App = (function () {
         roomId: null,
         encryptionKey: null,
         userId: null,
-        userName: 'ゲスト',
+        userName: null,
         roomCreatedAt: null,
         countdownInterval: null,
         localMessages: [] // ローカルモード用
@@ -19,6 +19,28 @@ const App = (function () {
 
     // DOM 要素
     let elements = {};
+
+    /**
+     * localStorage ヘルパー: 安全に取得
+     */
+    function storageGet(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * localStorage ヘルパー: 安全に保存
+     */
+    function storageSet(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch (e) {
+            // storage full or unavailable
+        }
+    }
 
     /**
      * DOM 要素をキャッシュ
@@ -100,34 +122,41 @@ const App = (function () {
     }
 
     /**
-     * シードの表示/非表示を切り替え
+     * Fix #4 JS: シードの表示/非表示を切り替え（type属性を使用）
      */
     function toggleSeedVisibility() {
         const input = elements.seedInput;
         const showIcon = elements.toggleVisibility.querySelector('.icon-show');
         const hideIcon = elements.toggleVisibility.querySelector('.icon-hide');
 
-        if (input.classList.contains('visible')) {
-            input.classList.remove('visible');
+        if (input.type === 'text') {
+            input.type = 'password';
             showIcon.classList.remove('hidden');
             hideIcon.classList.add('hidden');
         } else {
-            input.classList.add('visible');
+            input.type = 'text';
             showIcon.classList.add('hidden');
             hideIcon.classList.remove('hidden');
         }
     }
 
     /**
-     * 新しいシードを生成
+     * Fix #4 JS: 新しいシードを生成（type='text'で表示）
      */
     function generateNewSeed() {
         const seed = CryptoModule.generateSecureSeed();
         elements.generatedSeed.textContent = seed;
         elements.generatedSeedContainer.classList.remove('hidden');
         elements.seedInput.value = seed;
-        elements.seedInput.classList.add('visible');
-        showToast('新しいシードが生成されました', 'success');
+        elements.seedInput.type = 'text';
+
+        // Update visibility toggle icons to match
+        const showIcon = elements.toggleVisibility.querySelector('.icon-show');
+        const hideIcon = elements.toggleVisibility.querySelector('.icon-hide');
+        showIcon.classList.add('hidden');
+        hideIcon.classList.remove('hidden');
+
+        showToast(I18n.t('newSeedGenerated'), 'success');
     }
 
     /**
@@ -137,45 +166,66 @@ const App = (function () {
         const seed = elements.seedInput.value.trim();
 
         if (!seed) {
-            showToast('シードを入力してください', 'error');
+            showToast(I18n.t('enterSeed'), 'error');
             return;
         }
 
-        if (seed.length < 4) {
-            showToast('シードは4文字以上で入力してください', 'error');
+        // Fix #5: Minimum seed length raised from 4 to 12
+        if (seed.length < 12) {
+            showToast(I18n.t('seedMinLength'), 'error');
             return;
         }
 
         try {
             // ローディング表示
             elements.joinChatBtn.disabled = true;
-            elements.joinChatBtn.innerHTML = '<span>⏳</span> 接続中...';
+            elements.joinChatBtn.querySelector('[data-i18n="join"]').textContent = I18n.t('connecting');
 
             // シードから暗号化キーとルームIDを生成
             state.currentSeed = seed;
             state.roomId = await CryptoModule.generateRoomId(seed);
             state.encryptionKey = await CryptoModule.deriveKey(seed);
-            state.userId = CryptoModule.generateUserId();
-            state.roomCreatedAt = Date.now();
 
-            // ユーザー名を生成
-            state.userName = 'ゲスト' + Math.floor(Math.random() * 1000);
+            // Fix #7: Persistent userId per room
+            const userIdKey = 'seedchat-userId-' + state.roomId;
+            const storedUserId = storageGet(userIdKey);
+            if (storedUserId) {
+                state.userId = storedUserId;
+            } else {
+                state.userId = CryptoModule.generateUserId();
+                storageSet(userIdKey, state.userId);
+            }
+
+            // Fix #16: Persistent userName per room
+            const userNameKey = 'seedchat-userName-' + state.roomId;
+            const storedUserName = storageGet(userNameKey);
+            if (storedUserName) {
+                state.userName = storedUserName;
+            } else {
+                state.userName = I18n.t('guestPrefix') + Math.floor(Math.random() * 1000);
+                storageSet(userNameKey, state.userName);
+            }
 
             // UI を初期化
             ChatUI.init();
             ChatUI.setUserName(state.userName);
             ChatUI.clearMessages();
-            ChatUI.setRoomCreatedAt(state.roomCreatedAt);
 
             // Supabase に接続（設定されている場合）
             if (SupabaseClient.getIsConfigured()) {
                 await SupabaseClient.joinRoom(state.roomId, handleIncomingMessage);
                 await loadExistingMessages();
-                ChatUI.setConnectionStatus('接続済み', true);
+                ChatUI.setConnectionStatus(I18n.t('connected'), true);
             } else {
-                ChatUI.setConnectionStatus('ローカルモード', true);
-                ChatUI.addSystemMessage('ローカルモードで動作中です。Supabaseを設定するとリアルタイム通信が可能になります。');
+                ChatUI.setConnectionStatus(I18n.t('localMode'), true);
+                ChatUI.addSystemMessage(I18n.t('localModeMsg'));
             }
+
+            // Fix #6: Set roomCreatedAt AFTER loading messages (uses oldest message timestamp)
+            if (!state.roomCreatedAt) {
+                state.roomCreatedAt = Date.now();
+            }
+            ChatUI.setRoomCreatedAt(state.roomCreatedAt);
 
             // 画面を切り替え
             elements.homeScreen.classList.add('hidden');
@@ -187,29 +237,36 @@ const App = (function () {
             // 入力にフォーカス
             ChatUI.focusInput();
 
-            showToast('チャットルームに参加しました', 'success');
+            showToast(I18n.t('joinedRoom'), 'success');
 
         } catch (error) {
-            console.error('チャット参加エラー:', error);
-            showToast('接続に失敗しました', 'error');
+            console.error('Chat join error:', error);
+            showToast(I18n.t('connectionFailed'), 'error');
         } finally {
             elements.joinChatBtn.disabled = false;
-            elements.joinChatBtn.innerHTML = '<span>🚀</span> 参加';
+            elements.joinChatBtn.querySelector('[data-i18n="join"]').textContent = I18n.t('join');
         }
     }
 
     /**
-     * 既存のメッセージを読み込み
+     * Fix #6: 既存のメッセージを読み込み（最古のメッセージからroomCreatedAtを設定）
      */
     async function loadExistingMessages() {
         const messages = await SupabaseClient.getMessages(state.roomId);
 
+        // Fix #6: Use the oldest message's created_at as the room creation time
+        if (messages.length > 0 && messages[0].created_at) {
+            state.roomCreatedAt = new Date(messages[0].created_at).getTime();
+        }
+
         for (const msg of messages) {
             try {
+                // Fix #13: Pass roomId as AAD
                 const decrypted = await CryptoModule.decrypt(
                     msg.iv,
                     msg.ciphertext,
-                    state.encryptionKey
+                    state.encryptionKey,
+                    state.roomId
                 );
 
                 if (decrypted) {
@@ -218,7 +275,7 @@ const App = (function () {
                     ChatUI.addMessage(messageData, isOwn);
                 }
             } catch (error) {
-                console.error('メッセージ復号エラー:', error);
+                console.error('Message decryption error:', error);
             }
         }
     }
@@ -228,10 +285,12 @@ const App = (function () {
      */
     async function handleIncomingMessage(encryptedMessage) {
         try {
+            // Fix #13: Pass roomId as AAD
             const decrypted = await CryptoModule.decrypt(
                 encryptedMessage.iv,
                 encryptedMessage.ciphertext,
-                state.encryptionKey
+                state.encryptionKey,
+                state.roomId
             );
 
             if (decrypted) {
@@ -240,7 +299,7 @@ const App = (function () {
                 ChatUI.addMessage(messageData, isOwn);
             }
         } catch (error) {
-            console.error('受信メッセージ処理エラー:', error);
+            console.error('Incoming message error:', error);
         }
     }
 
@@ -252,13 +311,26 @@ const App = (function () {
 
         if (!text) return;
 
+        // Fix #17 JS: Max message length check
+        if (text.length > 5000) {
+            showToast(I18n.t('msgTooLong'), 'error');
+            return;
+        }
+
         if (!state.encryptionKey) {
-            showToast('暗号化キーがありません', 'error');
+            showToast(I18n.t('noEncryptionKey'), 'error');
+            return;
+        }
+
+        // Fix #10: Block sending after TTL expires
+        if (state.roomCreatedAt && Date.now() - state.roomCreatedAt >= SupabaseClient.MESSAGE_TTL_MS) {
+            showToast(I18n.t('roomExpired'), 'error');
             return;
         }
 
         try {
             // メッセージデータを作成
+            // Fix #14: senderId is persistent (Fix #7) but without server auth, it's still forgeable client-side
             const messageData = {
                 id: CryptoModule.generateUserId(),
                 senderId: state.userId,
@@ -267,10 +339,11 @@ const App = (function () {
                 timestamp: Date.now()
             };
 
-            // 暗号化
+            // Fix #13: Pass roomId as AAD
             const encrypted = await CryptoModule.encrypt(
                 JSON.stringify(messageData),
-                state.encryptionKey
+                state.encryptionKey,
+                state.roomId
             );
 
             // ローカルに表示
@@ -287,29 +360,34 @@ const App = (function () {
             }
 
         } catch (error) {
-            console.error('メッセージ送信エラー:', error);
-            showToast('メッセージの送信に失敗しました', 'error');
+            console.error('Message send error:', error);
+            showToast(I18n.t('sendFailed'), 'error');
         }
     }
 
     /**
-     * 名前を変更
+     * Fix #16: 名前を変更（localStorageに永続化）
      */
     function changeName() {
         const newName = ChatUI.getUserName();
 
         if (!newName) {
-            showToast('名前を入力してください', 'error');
+            showToast(I18n.t('enterName'), 'error');
             return;
         }
 
         if (newName.length > 20) {
-            showToast('名前は20文字以内で入力してください', 'error');
+            showToast(I18n.t('nameTooLong'), 'error');
             return;
         }
 
         state.userName = newName;
-        showToast('名前を変更しました', 'success');
+
+        if (state.roomId) {
+            storageSet('seedchat-userName-' + state.roomId, newName);
+        }
+
+        showToast(I18n.t('nameChanged'), 'success');
     }
 
     /**
@@ -335,13 +413,20 @@ const App = (function () {
         // UI をリセット
         ChatUI.clearMessages();
         elements.seedInput.value = '';
+        elements.seedInput.type = 'password';
         elements.generatedSeedContainer.classList.add('hidden');
+
+        // Reset visibility toggle icons
+        const showIcon = elements.toggleVisibility.querySelector('.icon-show');
+        const hideIcon = elements.toggleVisibility.querySelector('.icon-hide');
+        showIcon.classList.remove('hidden');
+        hideIcon.classList.add('hidden');
 
         // 画面を切り替え
         elements.chatScreen.classList.add('hidden');
         elements.homeScreen.classList.remove('hidden');
 
-        showToast('チャットから退出しました', 'info');
+        showToast(I18n.t('leftChat'), 'info');
     }
 
     /**
@@ -360,7 +445,7 @@ const App = (function () {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        showToast('アーカイブを保存しました', 'success');
+        showToast(I18n.t('archiveSaved'), 'success');
     }
 
     /**
@@ -373,12 +458,12 @@ const App = (function () {
 
         const update = () => {
             const elapsed = Date.now() - state.roomCreatedAt;
-            const remaining = 12 * 60 * 60 * 1000 - elapsed; // 12時間
+            const remaining = SupabaseClient.MESSAGE_TTL_MS - elapsed;
             ChatUI.updateCountdown(remaining);
 
             if (remaining <= 0) {
                 clearInterval(state.countdownInterval);
-                ChatUI.addSystemMessage('このチャットルームは12時間が経過したため、新しいメッセージは保存されません。');
+                ChatUI.addSystemMessage(I18n.t('ttlExpiredMsg'));
             }
         };
 
@@ -387,40 +472,66 @@ const App = (function () {
     }
 
     /**
-     * クリップボードにコピー
+     * Fix #18: クリップボードにコピー（execCommand フォールバック改善）
      */
     async function copyToClipboard(text) {
         try {
             await navigator.clipboard.writeText(text);
-            showToast('コピーしました', 'success');
+            showToast(I18n.t('copied'), 'success');
         } catch (error) {
-            // フォールバック
+            // Fix #18: Improved fallback with proper hiding and error handling
             const textarea = document.createElement('textarea');
             textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
             document.body.appendChild(textarea);
             textarea.select();
-            document.execCommand('copy');
+            try {
+                const success = document.execCommand('copy');
+                if (success) {
+                    showToast(I18n.t('copied'), 'success');
+                } else {
+                    showToast(I18n.t('copyFailed'), 'error');
+                }
+            } catch (e) {
+                showToast(I18n.t('copyFailed'), 'error');
+            }
             document.body.removeChild(textarea);
-            showToast('コピーしました', 'success');
         }
     }
 
     /**
-     * トースト通知を表示
+     * Fix #8 + #19: トースト通知を表示（XSS対策 + スタッキング制限）
      */
     function showToast(message, type = 'info') {
         const container = document.getElementById('toast-container');
+
+        // Fix #19: Remove oldest toasts if 3+ are visible
+        while (container.children.length >= 3) {
+            container.removeChild(container.firstChild);
+        }
+
         const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `
-            <span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
-            <span>${message}</span>
-        `;
+        toast.className = 'toast ' + type;
+
+        // Fix #8: Use createElement/textContent instead of innerHTML to prevent XSS
+        const iconSpan = document.createElement('span');
+        iconSpan.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+
+        const msgSpan = document.createElement('span');
+        msgSpan.textContent = message;
+
+        toast.appendChild(iconSpan);
+        toast.appendChild(msgSpan);
         container.appendChild(toast);
 
         setTimeout(() => {
             toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                }
+            }, 300);
         }, 3000);
     }
 
@@ -430,9 +541,12 @@ const App = (function () {
     async function init() {
         // Web Crypto API の確認
         if (!CryptoModule.isAvailable()) {
-            alert('このブラウザは Web Crypto API に対応していません。最新のブラウザをお使いください。');
+            alert(I18n.t('cryptoNotAvailable'));
             return;
         }
+
+        // i18n を初期化
+        I18n.init();
 
         // DOM 要素をキャッシュ
         cacheElements();
@@ -447,7 +561,7 @@ const App = (function () {
         elements.loadingScreen.classList.add('hidden');
         elements.app.classList.remove('hidden');
 
-        console.log('Seed Chat 初期化完了');
+        console.log('Seed Chat initialized');
     }
 
     // 公開 API
